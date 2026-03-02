@@ -1,42 +1,21 @@
-// app/admin/products/page.js
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n) => new Intl.NumberFormat("id-ID").format(n ?? 0);
 const fmtPrice = (n) => `Rp ${fmt(n)}`;
 
-const CATEGORY_COLORS = {
-  sellable: { bg: "rgba(41,128,185,.1)", text: "#2980b9" },
-  consumable: { bg: "rgba(142,68,173,.1)", text: "#8e44ad" },
-  both: { bg: "rgba(46,64,49,.1)", text: "#2E4031" },
+const TIER_COLORS = {
+  member: { bg: "rgba(41,128,185,.1)", text: "#2980b9" },
+  silver: { bg: "rgba(127,140,141,.15)", text: "#7f8c8d" },
+  gold: { bg: "rgba(243,156,18,.12)", text: "#d68910" },
 };
 
-function StockBadge({ qty, threshold }) {
-  const low = qty <= threshold;
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        padding: "3px 9px",
-        borderRadius: 99,
-        fontSize: ".72rem",
-        fontWeight: 600,
-        background: low ? "rgba(230,126,34,.12)" : "rgba(39,174,96,.1)",
-        color: low ? "#e67e22" : "#27ae60",
-      }}
-    >
-      <i
-        className={`fa-solid ${low ? "fa-triangle-exclamation" : "fa-circle-check"}`}
-        style={{ fontSize: 9 }}
-      />
-      {qty}
-    </span>
-  );
-}
+const TIER_ICONS = {
+  member: "fa-user",
+  silver: "fa-medal",
+  gold: "fa-crown",
+};
 
 function Modal({ open, onClose, title, children, width = 560 }) {
   useEffect(() => {
@@ -169,38 +148,22 @@ const inputStyle = {
 
 const selectStyle = { ...inputStyle, cursor: "pointer" };
 
-// ─── Main page ────────────────────────────────────────────────────────────────
-export default function ProductsPage() {
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [units, setUnits] = useState([]);
+export default function CustomersPage() {
+  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
-  const [showInactive, setShowInactive] = useState(false);
+  const [tierFilter, setTierFilter] = useState("all");
 
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
   const [selected, setSelected] = useState(null);
-
-  const EMPTY = {
-    name: "",
-    sku: "",
-    category_id: "",
-    stock_unit_id: "",
-    purchase_unit_id: "",
-    purchase_to_stock_qty: 1,
-    cost_price: 0,
-    selling_price: 0,
-    low_stock_alert: 10,
-    notes: "",
-  };
-  const [form, setForm] = useState(EMPTY);
-  const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+  const [errors, setErrors] = useState({});
+
+  const EMPTY = { name: "", phone: "", tier: "member", notes: "" };
+  const [form, setForm] = useState(EMPTY);
 
   const showToast = (msg, ok = true) => {
     setToast({ msg, ok });
@@ -210,13 +173,11 @@ export default function ProductsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/products");
+      const res = await fetch("/api/admin/customers");
       const data = await res.json();
-      setProducts(data.products ?? []);
-      setCategories(data.categories ?? []);
-      setUnits(data.units ?? []);
+      setCustomers(data.customers ?? []);
     } catch {
-      showToast("Failed to load products.", false);
+      showToast("Failed to load customers.", false);
     } finally {
       setLoading(false);
     }
@@ -229,11 +190,7 @@ export default function ProductsPage() {
   const validate = () => {
     const e = {};
     if (!form.name.trim()) e.name = "Name is required.";
-    if (!form.category_id) e.category_id = "Select a category.";
-    if (!form.stock_unit_id) e.stock_unit_id = "Select stock unit.";
-    if (!form.purchase_unit_id) e.purchase_unit_id = "Select purchase unit.";
-    if (form.purchase_to_stock_qty <= 0)
-      e.purchase_to_stock_qty = "Must be > 0.";
+    if (!form.phone.trim()) e.phone = "Phone is required.";
     setErrors(e);
     return !Object.keys(e).length;
   };
@@ -242,7 +199,7 @@ export default function ProductsPage() {
     if (!validate()) return;
     setSaving(true);
     try {
-      const res = await fetch("/api/admin/products", {
+      const res = await fetch("/api/admin/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -252,7 +209,7 @@ export default function ProductsPage() {
         showToast(data.error, false);
         return;
       }
-      showToast("Product created.");
+      showToast("Customer registered.");
       setAddOpen(false);
       setForm(EMPTY);
       fetchData();
@@ -261,20 +218,13 @@ export default function ProductsPage() {
     }
   };
 
-  const openEdit = (p) => {
-    setSelected(p);
+  const openEdit = (c) => {
+    setSelected(c);
     setForm({
-      name: p.name,
-      sku: p.sku ?? "",
-      category_id: String(p.category_id),
-      stock_unit_id: String(p.stock_unit_id),
-      purchase_unit_id: String(p.purchase_unit_id),
-      purchase_to_stock_qty: p.purchase_to_stock_qty,
-      cost_price: p.cost_price,
-      selling_price: p.selling_price,
-      low_stock_alert: p.low_stock_alert,
-      notes: p.notes ?? "",
-      is_active: Boolean(p.is_active),
+      name: c.name,
+      phone: c.phone,
+      tier: c.tier,
+      notes: c.notes ?? "",
     });
     setErrors({});
     setEditOpen(true);
@@ -284,7 +234,7 @@ export default function ProductsPage() {
     if (!validate()) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/admin/products/${selected.id}`, {
+      const res = await fetch(`/api/admin/customers/${selected.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -294,7 +244,7 @@ export default function ProductsPage() {
         showToast(data.error, false);
         return;
       }
-      showToast("Product updated.");
+      showToast("Customer updated.");
       setEditOpen(false);
       fetchData();
     } finally {
@@ -302,210 +252,56 @@ export default function ProductsPage() {
     }
   };
 
-  const handleDelete = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/admin/products/${selected.id}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.error, false);
-        return;
-      }
-      showToast("Product deactivated.");
-      setDeleteOpen(false);
-      fetchData();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Tabs = All + each category
-  const tabs = [{ id: "all", name: "All", type: null }, ...categories];
-  const filtered = products.filter((p) => {
-    const matchTab =
-      activeTab === "all" || String(p.category_id) === String(activeTab);
+  const tiers = ["all", "member", "silver", "gold"];
+  const filtered = customers.filter((c) => {
+    const matchTier = tierFilter === "all" || c.tier === tierFilter;
     const matchSearch =
       !search ||
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      (p.sku ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchActive = showInactive ? true : p.is_active;
-    return matchTab && matchSearch && matchActive;
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.phone.includes(search);
+    return matchTier && matchSearch;
   });
 
-  const ProductForm = () => (
+  const stats = {
+    total: customers.length,
+    gold: customers.filter((c) => c.tier === "gold").length,
+    silver: customers.filter((c) => c.tier === "silver").length,
+    member: customers.filter((c) => c.tier === "member").length,
+  };
+
+  const CustomerForm = () => (
     <div style={{ display: "flex", flexWrap: "wrap", gap: "0 12px" }}>
-      <Field label='Product Name' required error={errors.name}>
+      <Field label='Full Name' required error={errors.name}>
         <input
           style={inputStyle}
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          placeholder='e.g. Arabica Gayo'
+          placeholder='e.g. Budi Santoso'
           onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
           onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
         />
       </Field>
-      <Field label='SKU' half error={errors.sku}>
+      <Field label='Phone' required half error={errors.phone}>
         <input
           style={inputStyle}
-          value={form.sku}
-          onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
-          placeholder='e.g. CBN-001'
+          value={form.phone}
+          onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+          placeholder='e.g. 081234567890'
           onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
           onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
         />
       </Field>
-      <Field label='Category' required half error={errors.category_id}>
+      <Field label='Tier' half>
         <select
           style={selectStyle}
-          value={form.category_id}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, category_id: e.target.value }))
-          }
+          value={form.tier}
+          onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value }))}
         >
-          <option value=''>— Select —</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
+          <option value='member'>Member</option>
+          <option value='silver'>Silver</option>
+          <option value='gold'>Gold</option>
         </select>
       </Field>
-      <Field label='Stock Unit' required half error={errors.stock_unit_id}>
-        <select
-          style={selectStyle}
-          value={form.stock_unit_id}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, stock_unit_id: e.target.value }))
-          }
-        >
-          <option value=''>— Select —</option>
-          {units.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name} ({u.abbr})
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field
-        label='Purchase Unit'
-        required
-        half
-        error={errors.purchase_unit_id}
-      >
-        <select
-          style={selectStyle}
-          value={form.purchase_unit_id}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, purchase_unit_id: e.target.value }))
-          }
-        >
-          <option value=''>— Select —</option>
-          {units.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name} ({u.abbr})
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field
-        label='Purchase → Stock Qty'
-        required
-        half
-        error={errors.purchase_to_stock_qty}
-      >
-        <input
-          style={inputStyle}
-          type='number'
-          min='0.01'
-          step='any'
-          value={form.purchase_to_stock_qty}
-          onChange={(e) =>
-            setForm((f) => ({
-              ...f,
-              purchase_to_stock_qty: parseFloat(e.target.value) || 1,
-            }))
-          }
-          onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-          onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
-        />
-      </Field>
-      <Field label='Cost Price (per purchase unit)' half>
-        <input
-          style={inputStyle}
-          type='number'
-          min='0'
-          value={form.cost_price}
-          onChange={(e) =>
-            setForm((f) => ({
-              ...f,
-              cost_price: parseFloat(e.target.value) || 0,
-            }))
-          }
-          onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-          onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
-        />
-      </Field>
-      <Field label='Selling Price (per stock unit)' half>
-        <input
-          style={inputStyle}
-          type='number'
-          min='0'
-          value={form.selling_price}
-          onChange={(e) =>
-            setForm((f) => ({
-              ...f,
-              selling_price: parseFloat(e.target.value) || 0,
-            }))
-          }
-          onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-          onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
-        />
-      </Field>
-      <Field label='Low Stock Alert Threshold' half>
-        <input
-          style={inputStyle}
-          type='number'
-          min='0'
-          value={form.low_stock_alert}
-          onChange={(e) =>
-            setForm((f) => ({
-              ...f,
-              low_stock_alert: parseFloat(e.target.value) || 0,
-            }))
-          }
-          onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-          onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
-        />
-      </Field>
-      {form.is_active !== undefined && (
-        <Field label='Status' half>
-          <div style={{ display: "flex", gap: 8 }}>
-            {[true, false].map((v) => (
-              <button
-                key={String(v)}
-                type='button'
-                onClick={() => setForm((f) => ({ ...f, is_active: v }))}
-                style={{
-                  flex: 1,
-                  padding: "8px",
-                  borderRadius: 8,
-                  border: `1.5px solid ${form.is_active === v ? "var(--accent)" : "var(--border)"}`,
-                  background:
-                    form.is_active === v ? "var(--accent)" : "var(--bg)",
-                  color: form.is_active === v ? "#fff" : "var(--muted)",
-                  fontSize: ".82rem",
-                  cursor: "pointer",
-                  fontFamily: "'DM Sans',sans-serif",
-                }}
-              >
-                {v ? "Active" : "Inactive"}
-              </button>
-            ))}
-          </div>
-        </Field>
-      )}
       <Field label='Notes'>
         <textarea
           style={{ ...inputStyle, resize: "vertical", minHeight: 72 }}
@@ -581,9 +377,11 @@ export default function ProductsPage() {
       <style>{`
         @keyframes fadeInBd { from{opacity:0} to{opacity:1} }
         @keyframes slideUpM { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
-        .prod-row:hover td { background: var(--bg) !important; }
+        .cust-row:hover td { background: var(--bg) !important; }
         .act-btn { opacity:0; transition:opacity .15s; }
-        .prod-row:hover .act-btn { opacity:1; }
+        .cust-row:hover .act-btn { opacity:1; }
+        .stat-card { transition: transform .2s; }
+        .stat-card:hover { transform: translateY(-2px); }
       `}</style>
 
       {toast && (
@@ -613,7 +411,6 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h1
           style={{
@@ -624,11 +421,105 @@ export default function ProductsPage() {
             marginBottom: 4,
           }}
         >
-          Products
+          Customers
         </h1>
         <p style={{ fontSize: ".85rem", color: "var(--muted)" }}>
-          Manage your product catalog, pricing, and unit settings.
+          Manage customer profiles and loyalty tiers.
         </p>
+      </div>
+
+      {/* Stats */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4,1fr)",
+          gap: 14,
+          marginBottom: 24,
+        }}
+      >
+        {[
+          {
+            label: "Total Customers",
+            value: stats.total,
+            icon: "fa-users",
+            color: "#2980b9",
+            bg: "rgba(41,128,185,.1)",
+          },
+          {
+            label: "Gold Members",
+            value: stats.gold,
+            icon: "fa-crown",
+            color: "#d68910",
+            bg: "rgba(243,156,18,.12)",
+          },
+          {
+            label: "Silver Members",
+            value: stats.silver,
+            icon: "fa-medal",
+            color: "#7f8c8d",
+            bg: "rgba(127,140,141,.15)",
+          },
+          {
+            label: "Members",
+            value: stats.member,
+            icon: "fa-user",
+            color: "#2980b9",
+            bg: "rgba(41,128,185,.1)",
+          },
+        ].map((s) => (
+          <div
+            key={s.label}
+            className='stat-card'
+            style={{
+              background: "var(--card)",
+              border: "1px solid var(--cb)",
+              borderRadius: 14,
+              padding: "16px 18px",
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+            }}
+          >
+            <div
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 11,
+                background: s.bg,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <i
+                className={`fa-solid ${s.icon}`}
+                style={{ color: s.color, fontSize: 17 }}
+              />
+            </div>
+            <div>
+              <div
+                style={{
+                  fontSize: "1.35rem",
+                  fontWeight: 700,
+                  color: "var(--text)",
+                  lineHeight: 1,
+                }}
+              >
+                {s.value}
+              </div>
+              <div
+                style={{
+                  fontSize: ".73rem",
+                  color: "var(--muted)",
+                  marginTop: 3,
+                }}
+              >
+                {s.label}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div
@@ -666,31 +557,12 @@ export default function ProductsPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder='Search name or SKU…'
+              placeholder='Search name or phone…'
               style={{ ...inputStyle, paddingLeft: 34 }}
               onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
               onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
             />
           </div>
-          <button
-            onClick={() => setShowInactive(!showInactive)}
-            style={{
-              padding: "9px 14px",
-              borderRadius: 8,
-              border: `1.5px solid ${showInactive ? "var(--accent)" : "var(--border)"}`,
-              background: showInactive ? "rgba(46,64,49,.1)" : "var(--bg)",
-              color: showInactive ? "var(--accent)" : "var(--muted)",
-              fontSize: ".82rem",
-              cursor: "pointer",
-              fontFamily: "'DM Sans',sans-serif",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <i className='fa-solid fa-eye' style={{ fontSize: 12 }} />
-            Show Inactive
-          </button>
           <button
             onClick={() => {
               setForm(EMPTY);
@@ -712,12 +584,12 @@ export default function ProductsPage() {
               fontFamily: "'DM Sans',sans-serif",
             }}
           >
-            <i className='fa-solid fa-plus' style={{ fontSize: 12 }} />
-            Add Product
+            <i className='fa-solid fa-user-plus' style={{ fontSize: 12 }} />
+            Add Customer
           </button>
         </div>
 
-        {/* Category tabs */}
+        {/* Tier tabs */}
         <div
           style={{
             overflowX: "auto",
@@ -732,20 +604,16 @@ export default function ProductsPage() {
               minWidth: "max-content",
             }}
           >
-            {tabs.map((tab) => {
+            {tiers.map((tier) => {
               const count =
-                tab.id === "all"
-                  ? products.filter((p) => showInactive || p.is_active).length
-                  : products.filter(
-                      (p) =>
-                        String(p.category_id) === String(tab.id) &&
-                        (showInactive || p.is_active),
-                    ).length;
-              const active = activeTab === String(tab.id);
+                tier === "all"
+                  ? customers.length
+                  : customers.filter((c) => c.tier === tier).length;
+              const active = tierFilter === tier;
               return (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(String(tab.id))}
+                  key={tier}
+                  onClick={() => setTierFilter(tier)}
                   style={{
                     padding: "11px 14px",
                     border: "none",
@@ -760,9 +628,20 @@ export default function ProductsPage() {
                     alignItems: "center",
                     gap: 6,
                     fontFamily: "'DM Sans',sans-serif",
+                    textTransform: "capitalize",
                   }}
                 >
-                  {tab.name}
+                  {tier === "all" ? (
+                    "All"
+                  ) : (
+                    <>
+                      <i
+                        className={`fa-solid ${TIER_ICONS[tier]}`}
+                        style={{ fontSize: 11 }}
+                      />
+                      {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                    </>
+                  )}
                   <span
                     style={{
                       padding: "1px 7px",
@@ -798,7 +677,7 @@ export default function ProductsPage() {
             style={{ padding: 60, textAlign: "center", color: "var(--muted)" }}
           >
             <i
-              className='fa-solid fa-box-open'
+              className='fa-solid fa-users-slash'
               style={{
                 fontSize: 32,
                 opacity: 0.3,
@@ -809,7 +688,7 @@ export default function ProductsPage() {
             <div
               style={{ fontWeight: 600, color: "var(--text)", marginBottom: 4 }}
             >
-              No products found
+              No customers found
             </div>
             <div style={{ fontSize: ".82rem" }}>
               Try adjusting your search or filter.
@@ -821,13 +700,12 @@ export default function ProductsPage() {
               <thead>
                 <tr style={{ background: "var(--bg)" }}>
                   {[
-                    "Product",
-                    "SKU",
-                    "Category",
-                    "Stock",
-                    "Cost Price",
-                    "Selling Price",
-                    "Status",
+                    "Customer",
+                    "Phone",
+                    "Tier",
+                    "Total Spent",
+                    "Points Balance",
+                    "Since",
                     "",
                   ].map((h) => (
                     <th
@@ -850,10 +728,10 @@ export default function ProductsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p, i) => (
+                {filtered.map((c, i) => (
                   <tr
-                    key={p.id}
-                    className='prod-row'
+                    key={c.id}
+                    className='cust-row'
                     style={{
                       borderBottom:
                         i < filtered.length - 1
@@ -864,70 +742,82 @@ export default function ProductsPage() {
                     <td style={{ padding: "13px 16px" }}>
                       <div
                         style={{
-                          fontWeight: 600,
-                          fontSize: ".88rem",
-                          color: "var(--text)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
                         }}
                       >
-                        {p.name}
+                        <div
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: 10,
+                            background: TIER_COLORS[c.tier]?.bg,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <i
+                            className={`fa-solid ${TIER_ICONS[c.tier]}`}
+                            style={{
+                              color: TIER_COLORS[c.tier]?.text,
+                              fontSize: 13,
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              fontSize: ".88rem",
+                              color: "var(--text)",
+                            }}
+                          >
+                            {c.name}
+                          </div>
+                          {c.notes && (
+                            <div
+                              style={{
+                                fontSize: ".72rem",
+                                color: "var(--muted)",
+                                marginTop: 1,
+                              }}
+                            >
+                              {c.notes}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div
-                        style={{
-                          fontSize: ".73rem",
-                          color: "var(--muted)",
-                          marginTop: 1,
-                        }}
-                      >
-                        1 {p.purchase_unit_abbr} = {p.purchase_to_stock_qty}{" "}
-                        {p.stock_unit_abbr}
-                      </div>
-                    </td>
-                    <td
-                      style={{
-                        padding: "13px 16px",
-                        fontSize: ".8rem",
-                        color: "var(--muted)",
-                        fontFamily: "monospace",
-                      }}
-                    >
-                      {p.sku ?? "—"}
-                    </td>
-                    <td style={{ padding: "13px 16px" }}>
-                      <span
-                        style={{
-                          ...CATEGORY_COLORS[p.category_type],
-                          padding: "3px 9px",
-                          borderRadius: 99,
-                          fontSize: ".72rem",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {p.category_name}
-                      </span>
-                    </td>
-                    <td style={{ padding: "13px 16px" }}>
-                      <StockBadge
-                        qty={p.stock_qty}
-                        threshold={p.low_stock_alert}
-                      />
-                      <span
-                        style={{
-                          fontSize: ".7rem",
-                          color: "var(--muted)",
-                          marginLeft: 4,
-                        }}
-                      >
-                        {p.stock_unit_abbr}
-                      </span>
                     </td>
                     <td
                       style={{
                         padding: "13px 16px",
                         fontSize: ".82rem",
                         color: "var(--muted)",
+                        fontFamily: "monospace",
                       }}
                     >
-                      {fmtPrice(p.cost_price)}
+                      {c.phone}
+                    </td>
+                    <td style={{ padding: "13px 16px" }}>
+                      <span
+                        style={{
+                          ...TIER_COLORS[c.tier],
+                          padding: "3px 9px",
+                          borderRadius: 99,
+                          fontSize: ".72rem",
+                          fontWeight: 600,
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        <i
+                          className={`fa-solid ${TIER_ICONS[c.tier]}`}
+                          style={{ marginRight: 5, fontSize: 10 }}
+                        />
+                        {c.tier}
+                      </span>
                     </td>
                     <td
                       style={{
@@ -937,23 +827,39 @@ export default function ProductsPage() {
                         color: "var(--text)",
                       }}
                     >
-                      {fmtPrice(p.selling_price)}
+                      {fmtPrice(c.total_spent)}
                     </td>
                     <td style={{ padding: "13px 16px" }}>
                       <span
                         style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
                           padding: "3px 9px",
                           borderRadius: 99,
-                          fontSize: ".7rem",
+                          fontSize: ".72rem",
                           fontWeight: 600,
-                          background: p.is_active
-                            ? "rgba(39,174,96,.1)"
-                            : "rgba(192,57,43,.1)",
-                          color: p.is_active ? "#27ae60" : "#c0392b",
+                          background: "rgba(46,64,49,.1)",
+                          color: "var(--accent)",
                         }}
                       >
-                        {p.is_active ? "Active" : "Inactive"}
+                        <i
+                          className='fa-solid fa-star'
+                          style={{ fontSize: 9 }}
+                        />
+                        {fmt(c.points_balance ?? 0)} pts
                       </span>
+                    </td>
+                    <td
+                      style={{
+                        padding: "13px 16px",
+                        fontSize: ".78rem",
+                        color: "var(--muted)",
+                      }}
+                    >
+                      {c.created_at
+                        ? new Date(c.created_at).toLocaleDateString("id-ID")
+                        : "—"}
                     </td>
                     <td style={{ padding: "13px 16px" }}>
                       <div
@@ -968,7 +874,7 @@ export default function ProductsPage() {
                             icon: "fa-eye",
                             title: "View",
                             action: () => {
-                              setSelected(p);
+                              setSelected(c);
                               setViewOpen(true);
                             },
                             hc: "rgba(41,128,185,.15)",
@@ -977,54 +883,41 @@ export default function ProductsPage() {
                           {
                             icon: "fa-pen-to-square",
                             title: "Edit",
-                            action: () => openEdit(p),
+                            action: () => openEdit(c),
                             hc: "rgba(46,64,49,.15)",
                             tc: "var(--accent)",
                           },
-                          {
-                            icon: "fa-ban",
-                            title: "Deactivate",
-                            action: () => {
-                              setSelected(p);
-                              setDeleteOpen(true);
-                            },
-                            hc: "rgba(192,57,43,.12)",
-                            tc: "#c0392b",
-                            hide: !p.is_active,
-                          },
-                        ]
-                          .filter((b) => !b.hide)
-                          .map((b) => (
-                            <button
-                              key={b.icon}
-                              className='act-btn'
-                              title={b.title}
-                              onClick={b.action}
-                              style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: 6,
-                                border: "none",
-                                background: "var(--bg)",
-                                cursor: "pointer",
-                                color: "var(--muted)",
-                                fontSize: 11,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = b.hc;
-                                e.currentTarget.style.color = b.tc;
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "var(--bg)";
-                                e.currentTarget.style.color = "var(--muted)";
-                              }}
-                            >
-                              <i className={`fa-solid ${b.icon}`} />
-                            </button>
-                          ))}
+                        ].map((b) => (
+                          <button
+                            key={b.icon}
+                            className='act-btn'
+                            title={b.title}
+                            onClick={b.action}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 6,
+                              border: "none",
+                              background: "var(--bg)",
+                              cursor: "pointer",
+                              color: "var(--muted)",
+                              fontSize: 11,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = b.hc;
+                              e.currentTarget.style.color = b.tc;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "var(--bg)";
+                              e.currentTarget.style.color = "var(--muted)";
+                            }}
+                          >
+                            <i className={`fa-solid ${b.icon}`} />
+                          </button>
+                        ))}
                       </div>
                     </td>
                   </tr>
@@ -1035,25 +928,27 @@ export default function ProductsPage() {
         )}
       </div>
 
-      {/* Add modal */}
       <Modal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        title='Add New Product'
-        width={600}
+        title='Register Customer'
+        width={540}
       >
-        <ProductForm />
-        <SaveBtn onClick={handleAdd} label='Create Product' icon='fa-plus' />
+        <CustomerForm />
+        <SaveBtn
+          onClick={handleAdd}
+          label='Register Customer'
+          icon='fa-user-plus'
+        />
       </Modal>
 
-      {/* Edit modal */}
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
         title={`Edit — ${selected?.name}`}
-        width={600}
+        width={540}
       >
-        <ProductForm />
+        <CustomerForm />
         <SaveBtn
           onClick={handleEdit}
           label='Save Changes'
@@ -1061,49 +956,96 @@ export default function ProductsPage() {
         />
       </Modal>
 
-      {/* View modal */}
       <Modal
         open={viewOpen}
         onClose={() => setViewOpen(false)}
-        title='Product Details'
+        title='Customer Details'
       >
         {selected && (
           <div>
             <div
               style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                padding: "14px 16px",
+                background: "var(--bg)",
+                borderRadius: 12,
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: 13,
+                  background: TIER_COLORS[selected.tier]?.bg,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <i
+                  className={`fa-solid ${TIER_ICONS[selected.tier]}`}
+                  style={{
+                    color: TIER_COLORS[selected.tier]?.text,
+                    fontSize: 20,
+                  }}
+                />
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: "1rem",
+                    color: "var(--text)",
+                  }}
+                >
+                  {selected.name}
+                </div>
+                <div
+                  style={{
+                    fontSize: ".8rem",
+                    color: "var(--muted)",
+                    marginTop: 2,
+                  }}
+                >
+                  {selected.phone}
+                </div>
+              </div>
+              <span
+                style={{
+                  marginLeft: "auto",
+                  ...TIER_COLORS[selected.tier],
+                  padding: "4px 12px",
+                  borderRadius: 99,
+                  fontSize: ".75rem",
+                  fontWeight: 700,
+                  textTransform: "capitalize",
+                }}
+              >
+                {selected.tier}
+              </span>
+            </div>
+            <div
+              style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
-                gap: 12,
+                gap: 10,
                 marginBottom: 16,
               }}
             >
               {[
-                { label: "Category", value: selected.category_name },
-                { label: "SKU", value: selected.sku ?? "—" },
+                { label: "Total Spent", value: fmtPrice(selected.total_spent) },
                 {
-                  label: "Stock Unit",
-                  value: `${selected.stock_unit_name} (${selected.stock_unit_abbr})`,
+                  label: "Points Balance",
+                  value: `${fmt(selected.points_balance ?? 0)} pts`,
                 },
                 {
-                  label: "Purchase Unit",
-                  value: `${selected.purchase_unit_name} (${selected.purchase_unit_abbr})`,
-                },
-                {
-                  label: "Conversion",
-                  value: `1 ${selected.purchase_unit_abbr} = ${selected.purchase_to_stock_qty} ${selected.stock_unit_abbr}`,
-                },
-                {
-                  label: "Current Stock",
-                  value: `${selected.stock_qty} ${selected.stock_unit_abbr}`,
-                },
-                { label: "Cost Price", value: fmtPrice(selected.cost_price) },
-                {
-                  label: "Selling Price",
-                  value: fmtPrice(selected.selling_price),
-                },
-                {
-                  label: "Low Stock Alert",
-                  value: `${selected.low_stock_alert} ${selected.stock_unit_abbr}`,
+                  label: "Member Since",
+                  value: selected.created_at
+                    ? new Date(selected.created_at).toLocaleDateString("id-ID")
+                    : "—",
                 },
               ].map((r) => (
                 <div
@@ -1143,6 +1085,7 @@ export default function ProductsPage() {
                   padding: "10px 14px",
                   fontSize: ".85rem",
                   color: "var(--muted)",
+                  marginBottom: 16,
                 }}
               >
                 <b style={{ color: "var(--text)" }}>Notes: </b>
@@ -1156,7 +1099,6 @@ export default function ProductsPage() {
               }}
               style={{
                 width: "100%",
-                marginTop: 16,
                 padding: "11px",
                 borderRadius: 9,
                 border: "none",
@@ -1172,102 +1114,8 @@ export default function ProductsPage() {
                 className='fa-solid fa-pen-to-square'
                 style={{ marginRight: 8 }}
               />
-              Edit Product
+              Edit Customer
             </button>
-          </div>
-        )}
-      </Modal>
-
-      {/* Deactivate confirm */}
-      <Modal
-        open={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        title='Deactivate Product'
-      >
-        {selected && (
-          <div>
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                padding: "12px 16px",
-                background: "rgba(192,57,43,.07)",
-                border: "1px solid rgba(192,57,43,.2)",
-                borderRadius: 10,
-                marginBottom: 20,
-              }}
-            >
-              <i
-                className='fa-solid fa-triangle-exclamation'
-                style={{
-                  color: "#c0392b",
-                  fontSize: 18,
-                  flexShrink: 0,
-                  marginTop: 2,
-                }}
-              />
-              <div
-                style={{
-                  fontSize: ".88rem",
-                  color: "var(--text)",
-                  lineHeight: 1.6,
-                }}
-              >
-                <b>{selected.name}</b> will be marked inactive and hidden from
-                new orders. This can be reversed by editing the product.
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                onClick={() => setDeleteOpen(false)}
-                style={{
-                  flex: 1,
-                  padding: "11px",
-                  borderRadius: 9,
-                  border: "1.5px solid var(--border)",
-                  background: "none",
-                  color: "var(--muted)",
-                  fontSize: ".88rem",
-                  cursor: "pointer",
-                  fontFamily: "'DM Sans',sans-serif",
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={saving}
-                style={{
-                  flex: 2,
-                  padding: "11px",
-                  borderRadius: 9,
-                  border: "none",
-                  background: "#c0392b",
-                  color: "#fff",
-                  fontSize: ".88rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  opacity: saving ? 0.7 : 1,
-                  fontFamily: "'DM Sans',sans-serif",
-                }}
-              >
-                {saving ? (
-                  <>
-                    <i className='fa-solid fa-circle-notch fa-spin' />
-                    Processing…
-                  </>
-                ) : (
-                  <>
-                    <i className='fa-solid fa-ban' />
-                    Deactivate
-                  </>
-                )}
-              </button>
-            </div>
           </div>
         )}
       </Modal>

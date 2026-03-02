@@ -1,3 +1,5 @@
+// app/api/admin/products/route.js
+
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getUserFromRequest } from "@/lib/auth";

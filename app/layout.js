@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: "Kopi Flow",
-  description: "",
+  description: "A Slow Cup In A Fast World",
   icons: {
     icon: "/logo.ico",
   },
